@@ -49,7 +49,7 @@ lib.write_gds('outputs/first.gds')
 cell.write_svg('outputs/first.svg')
 
 # Display all cells using the internal viewer.
-gdspy.LayoutViewer()
+gdspy.LayoutViewer(lib)
 
 # path2 = gdspy.Path(0.5, (0, 0))
 
