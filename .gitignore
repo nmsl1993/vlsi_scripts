@@ -1,0 +1,9 @@
+outputs/*
+
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pywz
