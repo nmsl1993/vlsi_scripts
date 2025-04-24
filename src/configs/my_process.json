@@ -1,0 +1,11 @@
+{
+    "M5": {
+        "gds_layer": 33
+    },
+    "M6": {
+        "gds_layer": 38
+    },
+    "vias": {
+        "gds_layer": 39
+    }
+}

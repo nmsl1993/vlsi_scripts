@@ -1,84 +1,76 @@
 import phidl
-import numpy
+import numpy as np
 import gdspy
+import argparse
 
-# The GDSII file is called a library, which contains multiple cells.
-lib = gdspy.GdsLibrary()
+# using parameters from cadence initially:
+DEFAULT_TRACE_WIDTH = 3 #um
+DEFAULT_INNER_RADIUS = 30 #um
+DEFAULT_NUM_TURNS = 3
+DEFAULT_GUARD_RING_DISTANCE = 50 #um
+DEFAULT_SPACING = 3 #um
 
-# Geometry must be placed in cells.
-cell = lib.new_cell('FIRST')
 
-# Create the geometry (a single rectangle) and add it to the cell.
-path2 = gdspy.Path(0.5, (0, 0))
 
-# Start the path with a smooth Bezier S-curve
-path2.bezier([(0, 5), (5, 5), (5, 10)])
+def generate_spiral_inductor(trace_width, inner_radius, num_turns, guard_ring_distance, spacing):
+    # Generates a spiral inductor with the given parameters
+    # Define transition to be at bottom of octagon and entry/exit to be at top of octagon   
+    
+    # Parameters:
+    #   cell: the cell to add the spiral to
+    #   width: the width of the spiral
+    #   inner_radius: the inner radius of the spiral
+    #   num_turns: the number of turns in the spiral
+    #   guard_ring_distance: the distance of the guard ring from the spiral 
+    #   spacing: the spacing between the turns
+    
+    # The GDSII file is called a library, which contains multiple cells.
+    lib = gdspy.GdsLibrary()
+    # Geometry must be placed in cells.
+    cell = lib.new_cell('spiral_inductor_python')
 
-# We want to add a spiral curve to the path.  The spiral is defined
-# as a parametric curve.  We make sure spiral(0) = (0, 0) so that
-# the path is continuous.
-def spiral(u):
-    r = 4 - 3 * u
-    theta = 5 * u * numpy.pi
-    x = r * numpy.cos(theta) - 4
-    y = r * numpy.sin(theta)
-    return (x, y)
+    # Calculate the outer radius of the spiral
+    outer_radius = inner_radius + trace_width
+    # Draw octagon for inner radius
+    points = []
+    #for radius in [inner_radius, outer_radius]:
+    for quad_idx in range(4):
+        for angle_idx in range(4):
+            angle = np.pi / 2 + quad_idx * np.pi / 2 + angle_idx * np.pi / 6
+            print(f'{np.degrees(angle):.1f}, {inner_radius}')
+            x1 = np.around(inner_radius * np.cos(angle), 10)
+            y1 = np.around(inner_radius * np.sin(angle), 10)
+            points.append((x1, y1))
+        for angle_idx in range(4)[::-1]:
+            angle = np.pi / 2 + quad_idx * np.pi / 2 + angle_idx * np.pi / 6
+            print(f'{np.degrees(angle):.1f}, {outer_radius}')
 
-# It is recommended to also define the derivative of the parametric
-# curve, otherwise this derivative must be calculated nummerically.
-# The derivative is used to define the side boundaries of the path,
-# so, in this case, to ensure continuity with the existing S-curve,
-# we make sure the the direction at the start of the spiral is
-# pointing exactly upwards, as if is radius were constant.
-# Additionally, the exact magnitude of the derivative is not
-# important; gdspy only uses its direction.
-def dspiral_dt(u):
-    theta = 5 * u * numpy.pi
-    dx_dt = -numpy.sin(theta)
-    dy_dt = numpy.cos(theta)
-    return (dx_dt, dy_dt)
+            x2 = np.around(outer_radius * np.cos(angle), 10)    
+            y2 = np.around(outer_radius * np.sin(angle), 10)
+            points.append((x2, y2))
+        print(points)
+        break
 
-# Add the parametric spiral to the path
-path2.parametric(spiral, dspiral_dt)
-cell.add(path2)
+    # Create polygon path with width
+    octagon = gdspy.Polygon(points)
+    cell.add(octagon)
+    # Save as GDS file
+    lib.write_gds('outputs/spiral_inductor.gds')
+    
+    # Save as SVG file for visualization
+    cell.write_svg('outputs/ spiral_inductor.svg')
+    
+    # Show the cell in a GUI window
+    gdspy.LayoutViewer(lib)
+    
+    #outer_radius = inner_radius + (num_turns - 1) * spacing
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate a spiral inductor')
+    parser.add_argument('--trace_width', type=float, default=DEFAULT_TRACE_WIDTH, help='Width of the spiral')
+    parser.add_argument('--inner_radius', type=float, default=DEFAULT_INNER_RADIUS, help='Inner radius of the spiral')
+    parser.add_argument('--num_turns', type=int, default=DEFAULT_NUM_TURNS, help='Number of turns in the spiral')
+    parser.add_argument('--guard_ring_distance', type=float, default=DEFAULT_GUARD_RING_DISTANCE, help='Distance of the guard ring from the spiral')
+    parser.add_argument('--spacing', type=float, default=DEFAULT_SPACING, help='Spacing between the turns')
+    args = parser.parse_args()
 
-# Save the library in a file called 'first.gds'.
-lib.write_gds('outputs/first.gds')
-
-# Optionally, save an image of the cell as SVG.
-cell.write_svg('outputs/first.svg')
-
-# Display all cells using the internal viewer.
-gdspy.LayoutViewer(lib)
-
-# path2 = gdspy.Path(0.5, (0, 0))
-
-# # Start the path with a smooth Bezier S-curve
-# path2.bezier([(0, 5), (5, 5), (5, 10)])
-
-# # We want to add a spiral curve to the path.  The spiral is defined
-# # as a parametric curve.  We make sure spiral(0) = (0, 0) so that
-# # the path is continuous.
-# def spiral(u):
-#     r = 4 - 3 * u
-#     theta = 5 * u * numpy.pi
-#     x = r * numpy.cos(theta) - 4
-#     y = r * numpy.sin(theta)
-#     return (x, y)
-# import gdspy
-# # It is recommended to also define the derivative of the parametric
-# # curve, otherwise this derivative must be calculated nummerically.
-# # The derivative is used to define the side boundaries of the path,
-# # so, in this case, to ensure continuity with the existing S-curve,
-# # we make sure the the direction at the start of the spiral is
-# # pointing exactly upwards, as if is radius were constant.
-# # Additionally, the exact magnitude of the derivative is not
-# # important; gdspy only uses its direction.
-# def dspiral_dt(u):
-#     theta = 5 * u * numpy.pi
-#     dx_dt = -numpy.sin(theta)
-#     dy_dt = numpy.cos(theta)
-#     return (dx_dt, dy_dt)
-
-# # Add the parametric spiral to the path
-# path2.parametric(spiral, dspiral_dt)
+    generate_spiral_inductor(args.trace_width, args.inner_radius, args.num_turns, args.guard_ring_distance, args.spacing)

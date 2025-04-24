@@ -1,5 +1,9 @@
 outputs/*
 pdk_examples/*
+
+*.gds
+*.svg
+
 *.pyc
 *.pyo
 *.pyd
