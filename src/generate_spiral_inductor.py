@@ -29,31 +29,21 @@ def generate_spiral_inductor(trace_width, inner_radius, num_turns, guard_ring_di
     # Geometry must be placed in cells.
     cell = lib.new_cell('spiral_inductor_python')
 
-    # Calculate the outer radius of the spiral
-    outer_radius = inner_radius + trace_width
-    # Draw octagon for inner radius
-    points = []
-    #for radius in [inner_radius, outer_radius]:
-    for quad_idx in range(4):
-        for angle_idx in range(4):
-            angle = np.pi / 2 + quad_idx * np.pi / 2 + angle_idx * np.pi / 6
-            print(f'{np.degrees(angle):.1f}, {inner_radius}')
-            x1 = np.around(inner_radius * np.cos(angle), 10)
-            y1 = np.around(inner_radius * np.sin(angle), 10)
-            points.append((x1, y1))
-        for angle_idx in range(4)[::-1]:
-            angle = np.pi / 2 + quad_idx * np.pi / 2 + angle_idx * np.pi / 6
-            print(f'{np.degrees(angle):.1f}, {outer_radius}')
-
-            x2 = np.around(outer_radius * np.cos(angle), 10)    
-            y2 = np.around(outer_radius * np.sin(angle), 10)
-            points.append((x2, y2))
-        print(points)
-        break
-
-    # Create polygon path with width
-    octagon = gdspy.Polygon(points)
-    cell.add(octagon)
+    for turn_idx in range(num_turns):
+        trace_inner_radius = inner_radius + turn_idx * (spacing + trace_width)
+        trace_outer_radius = trace_inner_radius + trace_width
+        # Draw octagon for inner radius
+        for quad_idx in [0, 2, 4, 6]:
+            points = []
+            for radius, stride in [(trace_inner_radius, 1), (trace_outer_radius, -1)]:
+                for angle_idx in range(quad_idx, quad_idx + 3)[::stride]:
+                    angle = angle_idx * np.pi / 4 + np.pi / 8
+                    x2 = np.around(radius * np.cos(angle), 10)    
+                    y2 = np.around(radius * np.sin(angle), 10)
+                    points.append((x2, y2))
+        
+            segment = gdspy.Polygon(points)
+            cell.add(segment)
     # Save as GDS file
     lib.write_gds('outputs/spiral_inductor.gds')
     
