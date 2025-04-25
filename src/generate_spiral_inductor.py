@@ -9,7 +9,7 @@ DEFAULT_INNER_RADIUS = 30 #um
 DEFAULT_NUM_TURNS = 3
 DEFAULT_GUARD_RING_DISTANCE = 50 #um
 DEFAULT_SPACING = 3 #um
-
+POLYGON_NSIDES = 8 # Octagon
 
 
 def generate_spiral_inductor(trace_width, inner_radius, num_turns, guard_ring_distance, spacing):
@@ -29,17 +29,28 @@ def generate_spiral_inductor(trace_width, inner_radius, num_turns, guard_ring_di
     # Geometry must be placed in cells.
     cell = lib.new_cell('spiral_inductor_python')
 
+    POLYGON_OUTER_ANGLE = (POLYGON_NSIDES - 2) * np.pi / POLYGON_NSIDES
+    POLYGON_INNER_ANGLE = (np.pi - POLYGON_OUTER_ANGLE/2 - np.pi/2)*2
+    vertex_angles = np.arange(0, 2*np.pi, POLYGON_INNER_ANGLE/2)
+    vertex_normalized_radius = np.ones_like(vertex_angles) 
+    vertex_normalized_radius[np.arange(0, len(vertex_angles)) % 2 == 0] = np.cos(np.pi/8)
+    
+
     for turn_idx in range(num_turns):
         trace_inner_radius = inner_radius + turn_idx * (spacing + trace_width)
         trace_outer_radius = trace_inner_radius + trace_width
         # Draw octagon for inner radius
-        for quad_idx in [0, 2, 4, 6]:
+        for quad_idx in range(4):
             points = []
             for radius, stride in [(trace_inner_radius, 1), (trace_outer_radius, -1)]:
-                for angle_idx in range(quad_idx, quad_idx + 3)[::stride]:
-                    angle = angle_idx * np.pi / 4 + np.pi / 8
-                    x2 = np.around(radius * np.cos(angle), 10)    
-                    y2 = np.around(radius * np.sin(angle), 10)
+                for angle_idx in range(4*quad_idx, 4*quad_idx + 5)[::stride]:
+                    angle = vertex_angles[angle_idx % len(vertex_angles)]
+                    if quad_idx == 3 and angle_idx > 4*quad_idx +1:
+                        local_radius = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + spacing+trace_width)
+                    else:
+                        local_radius = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                    x2 = np.around(local_radius * np.cos(angle), 10)    
+                    y2 = np.around(local_radius * np.sin(angle), 10)
                     points.append((x2, y2))
         
             segment = gdspy.Polygon(points)
