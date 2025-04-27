@@ -1,11 +1,14 @@
 {
     "M5": {
-        "gds_layer": 33
+        "layer": 33,
+        "datatype": 0
     },
     "M6": {
-        "gds_layer": 38
+        "layer": 38,
+        "datatype": 0
     },
     "vias": {
-        "gds_layer": 39
+        "layer": 39,
+        "datatype": 0
     }
 }
