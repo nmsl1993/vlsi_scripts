@@ -26,7 +26,8 @@ def generate_spiral_transformer(
     # Parameters:
     #   cell: the cell to add the spiral to
     #   width: the width of the spiral
-    #   inner_radius: the inner radius of the spiral
+    #   inner_radius: the inner radius of the spiral,
+    #       defined as the distance from the center of the octagon to the center of the first trace
     #   num_turns: the number of turns in the spiral
     #   guard_ring_distance: the distance of the guard ring from the spiral 
     #   spacing: the spacing between the turns
@@ -50,47 +51,52 @@ def generate_spiral_transformer(
                 segment = gdspy.Polygon(via_points, **process_config['vias'])
                 cell.add(segment)  
     for coil_idx in range(2):
-        _entry_inner = ()
-        _entry_outer = ()
-        _exit_inner = ()
-        _exit_outer = ()
         for turn_idx in range(num_turns):
-            trace_inner_radius = float(inner_radius) + (2*turn_idx + coil_idx) * (spacing + trace_width)
-            trace_outer_radius = trace_inner_radius + trace_width
+            turn_inner_radius = inner_radius + (2*turn_idx + coil_idx) * (spacing + trace_width)
             quad_range = range(4)
             if turn_idx == 0:
-                print(f'coil_idx: {coil_idx}, trace_inner_radius: {trace_inner_radius}, trace_outer_radius: {trace_outer_radius}')
+                print(f'coil_idx: {coil_idx}')
             if opposite_side_entry and coil_idx == 1 and turn_idx == 0:
                 quad_range = [0,1]
             elif opposite_side_entry and coil_idx == 1 and turn_idx == num_turns - 1:
                 quad_range = [2,3]
             for quad_idx in quad_range:
                 points = []
-                for radius, stride in [(trace_inner_radius, 1), (trace_outer_radius, -1)]:
+                for radius, stride in [('inner', 1), ('outer', -1)]:
                     for angle_idx in range(4*quad_idx, 4*quad_idx + 5)[::stride]:
                         original_angle_idx = angle_idx
                         if opposite_side_entry and coil_idx == 1:
                             angle_idx = angle_idx + len(vertex_angles)//2
                         angle = vertex_angles[angle_idx % len(vertex_angles)]
-                        if quad_idx == 3 and angle_idx > 4*quad_idx and (coil_idx == 0 or not opposite_side_entry):
-                            local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
-                            local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                        elif opposite_side_entry and coil_idx == 1 and quad_idx == 1 and angle_idx > 4*quad_idx:
-                            local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
-                            local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                        octagon_radius = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
+                        octagon_inner_radius = turn_inner_radius*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
+                        #print(f'angle_idx: {angle_idx}, angle {angle}, angled {np.degrees(angle)}')
+                        if angle_idx % 2 == 1:
+                            octagon_outer_radius = octagon_inner_radius + trace_width/np.cos(np.pi/8)
                         else:
-                            local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                            local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                        if turn_idx == 0 and original_angle_idx == 4*quad_idx+4:
-                            if stride == 1:
-                                _entry_inner = np.array([local_radius_x, local_radius_y])
-                            else:
-                                _entry_outer = np.array([local_radius_x, local_radius_y])
-                        elif turn_idx == num_turns - 1 and original_angle_idx == 4*quad_idx + 4:
-                            if stride == 1:
-                                _exit_inner = np.array([local_radius_x, local_radius_y])
-                            else:
-                                _exit_outer = np.array([local_radius_x, local_radius_y])
+                         octagon_outer_radius = octagon_inner_radius + trace_width
+                        # if quad_idx == 3 and angle_idx > 4*quad_idx and (coil_idx == 0 or not opposite_side_entry):
+                        #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
+                        #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                        # elif opposite_side_entry and coil_idx == 1 and quad_idx == 1 and angle_idx > 4*quad_idx:
+                        #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
+                        #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                        #else:
+                        y_modifier = 0
+                        if quad_idx == 3 and angle_idx >= 4*quad_idx  and (coil_idx == 0 or not opposite_side_entry):
+                            y_modifier = 2*(spacing+trace_width)
+                            if angle_idx == len(vertex_angles):
+                                y_modifier = 2*(spacing+trace_width)*np.cos(np.pi/8) 
+                        elif opposite_side_entry and coil_idx == 1 and quad_idx == 1 and angle_idx > 4*quad_idx:
+                            y_modifier = 2*(spacing+trace_width)
+                            if angle_idx == len(vertex_angles):
+                                y_modifier = 2*(spacing+trace_width)*np.cos(np.pi/8)                             
+                        if radius == 'inner':
+                            local_radius_x = octagon_inner_radius
+                            local_radius_y = octagon_inner_radius + y_modifier
+                        else:
+                            local_radius_x = octagon_outer_radius
+                            local_radius_y = octagon_outer_radius + y_modifier
                         x2 = local_radius_x * np.cos(angle)   
                         y2 = local_radius_y * np.sin(angle)
                         points.append((x2, y2))
@@ -101,7 +107,8 @@ def generate_spiral_transformer(
             COS_PI_8 = np.cos(np.pi/8)
             coil_0_entry = np.array([-2*trace_width, inner_radius*COS_PI_8+trace_width/2])
             coil_1_entry = np.array([2*trace_width, -(inner_radius*COS_PI_8+trace_width/2)])# + 3/2*trace_width + spacing)])
-            coil_0_exit = np.array([2*trace_width, inner_radius+num_turns*2*spacing+(num_turns-1)*trace_width])
+            coil_0_exit = np.array([2*trace_width, inner_radius*COS_PI_8+trace_width/2 + 2*num_turns*(spacing+trace_width)*COS_PI_8])
+            coil_1_exit = np.array([-2*trace_width, -(inner_radius*COS_PI_8+trace_width/2 + (2*num_turns-1)*(spacing+trace_width)*COS_PI_8)])
 
             rectangle_length = inner_radius + num_turns*(spacing+trace_width)
 
@@ -129,7 +136,7 @@ def generate_spiral_transformer(
             add_entry_exit_traces(coil_0_entry, y_direction=1)
             add_entry_exit_traces(coil_1_entry, y_direction=-1)
             add_entry_exit_traces(coil_0_exit, y_direction=1)
-
+            add_entry_exit_traces(coil_1_exit, y_direction=-1)
 
  
             
