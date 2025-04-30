@@ -1,4 +1,3 @@
-import phidl
 import numpy as np
 import gdspy
 import argparse
@@ -179,10 +178,10 @@ if __name__ == "__main__":
     )
     suffix = f'tw{args.trace_width}_ir{args.inner_radius}_nt{args.num_turns}_s{args.spacing}'
     # Save as GDS file
-    lib.write_gds(f'outputs/spiral_transformer.{suffix}.gds')
-    print(f'outputs/spiral_transformer.{suffix}.gds')
+    lib.write_gds(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.gds")}')
+    print(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.gds")}')
     # Save as SVG file for visualization
-    cell.write_svg(f'outputs/spiral_transformer.{suffix}.svg')
+    cell.write_svg(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.svg")}')
     
     # Show the cell in a GUI window
     #gdspy.LayoutViewer(lib)
