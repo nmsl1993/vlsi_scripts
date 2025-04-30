@@ -13,6 +13,7 @@ DEFAULT_SPACING = 5 #um
 POLYGON_NSIDES = 8 # Octagon
 DEFAULT_VIA_SIDE_LENGTH = 0.36 #um
 DEFAULT_VIA_SPACING = 1.06 #um
+DEFAULT_ENTRY_EXIT_DISTANCE = 10 #um
 
 process_config = json.load(open(os.path.join(os.path.dirname(__file__), 'configs/my_process.json')))
 print(process_config)
@@ -106,24 +107,23 @@ def generate_spiral_transformer(
         if add_entry_exit_traces and opposite_side_entry:
             COS_PI_8 = np.cos(np.pi/8)
             coil_0_entry = np.array([-2*trace_width, inner_radius*COS_PI_8+trace_width/2])
-            coil_1_entry = np.array([2*trace_width, -(inner_radius*COS_PI_8+trace_width/2)])# + 3/2*trace_width + spacing)])
+            coil_1_entry = np.array([2*trace_width, -(inner_radius*COS_PI_8+trace_width/2 + (trace_width + spacing)*COS_PI_8)])# + 3/2*trace_width + spacing)])
             coil_0_exit = np.array([2*trace_width, inner_radius*COS_PI_8+trace_width/2 + 2*num_turns*(spacing+trace_width)*COS_PI_8])
             coil_1_exit = np.array([-2*trace_width, -(inner_radius*COS_PI_8+trace_width/2 + (2*num_turns-1)*(spacing+trace_width)*COS_PI_8)])
 
-            rectangle_length = inner_radius + num_turns*(spacing+trace_width)
 
-            def add_entry_exit_traces(coil_entry, y_direction=1):
+            def add_entry_exit_traces(coil_entry, y_direction, rectangle_length):
                 if y_direction == 1:
                     rectangle_points = np.array([
                         (-trace_width/2, -trace_width/2),
                         (trace_width/2, -trace_width/2),
-                        (trace_width/2, trace_width/2),#+rectangle_length),
-                        (-trace_width/2, trace_width/2)#+rectangle_length)
+                        (trace_width/2, trace_width/2+rectangle_length),
+                        (-trace_width/2, trace_width/2+rectangle_length)
                     ])
                 else:
                     rectangle_points = np.array([
-                        (-trace_width/2, -trace_width/2),#-rectangle_length),
-                        (trace_width/2, -trace_width/2),#-rectangle_length),
+                        (-trace_width/2, -trace_width/2-rectangle_length),
+                        (trace_width/2, -trace_width/2-rectangle_length),
                         (trace_width/2, trace_width/2),
                         (-trace_width/2, trace_width/2)
                     ])
@@ -133,11 +133,25 @@ def generate_spiral_transformer(
                 segment = gdspy.Polygon(coil_points, **process_config['M5'])
                 cell.add(segment)
                 generate_via_polygons(x=coil_entry[0], y=coil_entry[1])
-            add_entry_exit_traces(coil_0_entry, y_direction=1)
-            add_entry_exit_traces(coil_1_entry, y_direction=-1)
-            add_entry_exit_traces(coil_0_exit, y_direction=1)
-            add_entry_exit_traces(coil_1_exit, y_direction=-1)
+            
+            max_radius = np.max(np.abs([coil_0_entry[1], coil_1_entry[1], coil_0_exit[1], coil_1_exit[1]]))
 
+            add_entry_exit_traces(
+                coil_0_entry, y_direction=1, 
+                rectangle_length=(max_radius-np.abs(coil_0_entry[1])+DEFAULT_ENTRY_EXIT_DISTANCE)
+            )
+            add_entry_exit_traces(
+                coil_1_entry, y_direction=-1, 
+                rectangle_length=(max_radius-np.abs(coil_1_entry[1])+DEFAULT_ENTRY_EXIT_DISTANCE)
+            )   
+            add_entry_exit_traces(
+                coil_0_exit, y_direction=1, 
+                rectangle_length=(max_radius-np.abs(coil_0_exit[1])+DEFAULT_ENTRY_EXIT_DISTANCE)
+            )
+            add_entry_exit_traces(
+                coil_1_exit, y_direction=-1, 
+                rectangle_length=(max_radius-np.abs(coil_1_exit[1])+DEFAULT_ENTRY_EXIT_DISTANCE)
+            )   
  
             
     #outer_radius = inner_radius + (num_turns - 1) * spacing
@@ -163,10 +177,12 @@ if __name__ == "__main__":
         args.num_turns, args.guard_ring_distance,
         args.spacing, not args.same_side_entry, not args.no_entry_exit_traces
     )
+    suffix = f'tw{args.trace_width}_ir{args.inner_radius}_nt{args.num_turns}_s{args.spacing}'
     # Save as GDS file
-    lib.write_gds('outputs/spiral_transformer.gds')
+    lib.write_gds(f'outputs/spiral_transformer.{suffix}.gds')
+    print(f'outputs/spiral_transformer.{suffix}.gds')
     # Save as SVG file for visualization
-    cell.write_svg('outputs/ spiral_transformer.svg')
+    cell.write_svg(f'outputs/spiral_transformer.{suffix}.svg')
     
     # Show the cell in a GUI window
-    gdspy.LayoutViewer(lib)
+    #gdspy.LayoutViewer(lib)
