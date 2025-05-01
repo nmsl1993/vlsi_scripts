@@ -1,4 +1,3 @@
-import phidl
 import numpy as np
 import gdspy
 import argparse
