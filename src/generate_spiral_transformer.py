@@ -19,7 +19,8 @@ print(process_config)
 def generate_spiral_transformer(
     cell, trace_width, inner_radius,
     num_turns, guard_ring_distance,
-    spacing, opposite_side_entry, add_entry_exit_traces):
+    spacing, opposite_side_entry, add_entry_exit_traces,
+    include_vias):
     # Generates a spiral transformer with the given parameters
     # Define transition to be at bottom of octagon and entry/exit to be at top of octagon   
     
@@ -136,7 +137,8 @@ def generate_spiral_transformer(
                 coil_points[:,1] += coil_entry[1]
                 segment = gdspy.Polygon(coil_points, **process_config['M5'])
                 cell.add(segment)
-                generate_via_polygons(x=coil_entry[0], y=coil_entry[1])
+                if include_vias:
+                    generate_via_polygons(x=coil_entry[0], y=coil_entry[1])
             
             max_radius = np.max(np.abs([coil_0_entry[1], coil_1_entry[1], coil_0_exit[1], coil_1_exit[1]]))
 
@@ -163,7 +165,7 @@ if __name__ == "__main__":
     # The GDSII file is called a library, which contains multiple cells.
     lib = gdspy.GdsLibrary()
     # Geometry must be placed in cells.
-    cell = lib.new_cell('spiral_transformer_python')
+
 
     parser = argparse.ArgumentParser(description='Generate a spiral transformer')
     parser.add_argument('--trace_width', type=float, default=DEFAULT_TRACE_WIDTH, help='Width of the spiral')
@@ -171,17 +173,26 @@ if __name__ == "__main__":
     parser.add_argument('--num_turns', type=int, default=DEFAULT_NUM_TURNS, help='Number of turns in the spiral')
     parser.add_argument('--guard_ring_distance', type=float, default=DEFAULT_GUARD_RING_DISTANCE, help='Distance of the guard ring from the spiral')
     parser.add_argument('--spacing', type=float, default=DEFAULT_SPACING, help='Spacing between the turns')
-    parser.add_argument('--same_side_entry', action='store_false', default=False, help='Whether to have the second coil enter from the opposite side')
-    parser.add_argument('--no_entry_exit_traces', action='store_false', default=False, help='Do not add entry/exit traces')
+    parser.add_argument('--same_side_entry', action='store_true', default=False, help='Whether to have the second coil enter from the opposite side')
+    parser.add_argument('--no_entry_exit_traces', action='store_true', default=False, help='Do not add entry/exit traces')
+    parser.add_argument('--no_vias', action='store_true', default=False, help='Do not add vias')
 
     args = parser.parse_args()
-
+        
+    if args.no_vias:
+        cell = lib.new_cell('spiral_transformer_novias')
+    else:
+        cell = lib.new_cell('spiral_transformer_python')
     generate_spiral_transformer(
         cell, args.trace_width, args.inner_radius,
         args.num_turns, args.guard_ring_distance,
-        args.spacing, not args.same_side_entry, not args.no_entry_exit_traces
+        args.spacing, not args.same_side_entry, not args.no_entry_exit_traces, not args.no_vias
     )
     suffix = f'tw{args.trace_width}_ir{args.inner_radius}_nt{args.num_turns}_s{args.spacing}'
+    print(args)
+    if args.no_vias:
+        print('novias!')
+        suffix+='_novias'
     # Save as GDS file
     lib.write_gds(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.gds")}')
     print(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.gds")}')
