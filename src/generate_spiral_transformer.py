@@ -37,18 +37,23 @@ def generate_spiral_transformer(
     vertex_angles = np.arange(np.pi/2, 2*np.pi+np.pi/2, POLYGON_INNER_ANGLE/2)
     vertex_normalized_radius = np.ones_like(vertex_angles) 
     vertex_normalized_radius[np.arange(0, len(vertex_angles)) % 2 == 0] = np.cos(np.pi/8)
-    def generate_via_polygons(x, y, number_of_x_vias=4, number_of_y_vias=2, via_side_length=DEFAULT_VIA_SIDE_LENGTH, via_spacing=DEFAULT_VIA_SPACING):
+    def generate_via_polygons(x, y, number_of_x_vias=2, number_of_y_vias=2, via_side_length=DEFAULT_VIA_SIDE_LENGTH, via_spacing=DEFAULT_VIA_SPACING):
         for nx in range(number_of_x_vias):
             for ny in range(number_of_y_vias):
                 xx = x + (nx-(number_of_x_vias-1)/2)*via_spacing
                 yy = y + (ny-(number_of_y_vias-1)/2)*via_spacing
-                via_points = np.array([
-                    (xx+via_side_length/2, yy+via_side_length/2),
-                    (xx+via_side_length/2, yy-via_side_length/2),
-                    (xx-via_side_length/2, yy-via_side_length/2),
-                    (xx-via_side_length/2, yy+via_side_length/2),
-                ])
-                segment = gdspy.Polygon(via_points, **process_config['vias'])
+                # via_points = np.array([
+                #     (xx+via_side_length/2, yy+via_side_length/2),
+                #     (xx+via_side_length/2, yy-via_side_length/2),
+                #     (xx-via_side_length/2, yy-via_side_length/2),
+                #     (xx-via_side_length/2, yy+via_side_length/2),
+                # ])
+                # segment = gdspy.Polygon(via_points, **process_config['vias'])
+                segment = gdspy.Rectangle(
+                    point1=(xx-via_side_length/2, yy-via_side_length/2), 
+                    point2=(xx+via_side_length/2, yy+via_side_length/2), 
+                    **process_config['vias']
+                )
                 cell.add(segment)  
     for coil_idx in range(2):
         for turn_idx in range(num_turns):
@@ -184,4 +189,4 @@ if __name__ == "__main__":
     cell.write_svg(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.svg")}')
     
     # Show the cell in a GUI window
-    #gdspy.LayoutViewer(lib)
+    gdspy.LayoutViewer(lib)
