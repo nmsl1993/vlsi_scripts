@@ -61,11 +61,11 @@ def generate_octagon_spiral(
     
     #for radius in np.linspace(inner_radius, inner_radius + num_turns * (spacing + trace_width), 8*num_turns):
     COS_PI_8 = np.cos(np.pi/8)
-    x = 1#inner_radius*np.cos(3*np.pi/8)
+    x = inner_radius*np.cos(3*np.pi/8)
     y = inner_radius*np.sin(3*np.pi/8)
     for idx, step in enumerate(np.arange(0, num_turns, 1/8)):
         radius = inner_radius + step * (spacing + trace_width)
-        next_radius = inner_radius + (step + 1/8) * (spacing + trace_width)
+        next_radius = inner_radius + (step + 1/8) * (spacing + trace_width/COS_PI_8)
         
         print(f"idx: {idx} step: {step} radius: {radius}")
 
@@ -84,8 +84,9 @@ def generate_octagon_spiral(
         print(f"x: {x} y: {y}")
         path = gdspy.Text(f"{idx}", position=(x, y), size=1, layer=30, datatype=0)
         cell.add(path)
+        pdx, pdy = directions[(idx-1) % len(directions)]
         dx, dy = directions[idx % len(directions)]
-
+        ndx, ndy = directions[(idx+1) % len(directions)]
         # Equation of circle cecntered at zero is:
         # x^2 + y^2 = radius^2
         # Equation of line is:
@@ -124,14 +125,31 @@ def generate_octagon_spiral(
             xnext = xn1 if abs(xn1 - x) > abs(xn2 - x) else xn2
             ynext = m*xnext + b
         
-        vertex_angle = np.arctan2(y, x)
-        next_vertex_angle = np.arctan2(ynext, xnext)
 
+        if dx == 0 or dy == 0:
+            print(f"previous direction: {pdx}, {pdy}")
+            print(f"next direction: {ndx}, {ndy}")
+            vertex_angle = np.arctan2(pdy, pdx) + np.pi/2 + np.pi/8
+            next_vertex_angle = np.arctan2(ndy, ndx)  + np.pi/2 - np.pi/8            
+        else:
+            print(f"cur direction: {dx}, {dy}") 
+            vertex_angle = np.arctan2(dy, dx) + np.pi/2 - np.pi/8
+            next_vertex_angle = np.arctan2(dy, dx) + np.pi/2 + np.pi/8    
+        #vertex_angle = np.arctan2(y, x)
+        #next_vertex_angle = np.arctan2(ynext, xnext)
+                
+        print(f'y: {y} x: {x}')
+        print(f'next_y: {ynext} next_x: {xnext}')
+        # points = np.around(np.array([
+        #     (x-trace_width*np.cos(vertex_angle)/2,y-trace_width*np.sin(vertex_angle)/2),
+        #     (xnext-trace_width*np.cos(next_vertex_angle)/2, ynext-trace_width*np.sin(next_vertex_angle)/2),
+        #     (xnext+trace_width*np.cos(next_vertex_angle)/2, ynext+trace_width*np.sin(next_vertex_angle)/2),
+        #     (x+trace_width*np.cos(vertex_angle)/2, y+trace_width*np.sin(vertex_angle)/2)]),3)
         points = np.around(np.array([
-            (x-trace_width*np.cos(vertex_angle)/2,y-trace_width*np.sin(vertex_angle)/2),
-            (xnext-trace_width*np.cos(next_vertex_angle)/2, ynext-trace_width*np.sin(next_vertex_angle)/2),
-            (xnext+trace_width*np.cos(next_vertex_angle)/2, ynext+trace_width*np.sin(next_vertex_angle)/2),
-            (x+trace_width*np.cos(vertex_angle)/2, y+trace_width*np.sin(vertex_angle)/2)]),3)
+            (x,y),
+            (xnext, ynext),
+            (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
+            (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),3)
         print(f"points: {points}")
         path = gdspy.Polygon(points, layer=37, datatype=0)
         cell.add(path)
