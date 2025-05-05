@@ -7,9 +7,9 @@ import os
 # using parameters from cadence initially:
 DEFAULT_TRACE_WIDTH = 3 #um
 DEFAULT_INNER_RADIUS = 20 #um
-DEFAULT_NUM_TURNS = 3
+DEFAULT_NUM_TURNS = 1
 DEFAULT_GUARD_RING_DISTANCE = 50 #um
-DEFAULT_SPACING = 3 #um
+DEFAULT_SPACING = 8 #um
 POLYGON_NSIDES = 8 # Octagon
 
 process_config = json.load(open(os.path.join(os.path.dirname(__file__), 'configs/my_process.json')))
@@ -28,30 +28,47 @@ def generate_spiral_inductor(cell, trace_width, inner_radius, num_turns, guard_r
 
     POLYGON_OUTER_ANGLE = (POLYGON_NSIDES - 2) * np.pi / POLYGON_NSIDES
     POLYGON_INNER_ANGLE = (np.pi - POLYGON_OUTER_ANGLE/2 - np.pi/2)*2
-    vertex_angles = np.arange(np.pi/2, 2*np.pi+np.pi/2, POLYGON_INNER_ANGLE/2)
+    vertex_indices = np.arange(4, 4+(POLYGON_NSIDES*2)) % (POLYGON_NSIDES*2)
+    # Drop vertices that are multiple of 45 degrees
+    vertex_indices = vertex_indices[np.arange(0, len(vertex_indices)) % 4 != 2]
+    print(f'vertex_indices: {vertex_indices}')
+    vertex_angles = np.pi/POLYGON_NSIDES * vertex_indices
+
+    print(len(vertex_angles))
     vertex_normalized_radius = np.ones_like(vertex_angles) 
-    vertex_normalized_radius[np.arange(0, len(vertex_angles)) % 2 == 0] = np.cos(np.pi/8)
-    
+    vertex_normalized_radius[vertex_indices % 2 == 0] = np.cos(np.pi/8)
+   
+    print(f'vertex_angles: {np.degrees(vertex_angles)}')
 
     for turn_idx in range(num_turns):
-        trace_inner_radius = inner_radius + turn_idx * (spacing + trace_width)
-        trace_outer_radius = trace_inner_radius + trace_width
+        print(f'\nturn_idx: {turn_idx}\n')
         for quad_idx in range(4):
             points = []
-            for radius, stride in [(trace_inner_radius, 1), (trace_outer_radius, -1)]:
-                for angle_idx in range(4*quad_idx, 4*quad_idx + 5)[::stride]:
+            print(f'quad_idx: {quad_idx}')
+            for radius_modifier, stride in [(-trace_width/2, 1), (trace_width/2, -1)]:
+                if stride == 1:
+                    print(f'INNER:\n')
+                else:
+                    print(f'OUTER:\n')
+                for angle_idx in range(3*quad_idx, 3*quad_idx + 4)[::stride]:
                     angle = vertex_angles[angle_idx % len(vertex_angles)]
-                    if quad_idx == 3 and angle_idx > 4*quad_idx:
-                        local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + spacing+trace_width)
-                        local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                    else:
-                        local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                        local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                    fractional_turn_idx = turn_idx#+ quad_idx/4# + ((angle_idx % 4) > 2)/16
+                    #radius =(inner_radius + turn_idx * (spacing + trace_width) + radius_modifier)*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
+                    radius = (inner_radius + turn_idx * (spacing + trace_width) + radius_modifier)*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
+                    print(f'''angle_idx: {angle_idx},angle: {np.degrees(angle)}, radius: {radius},'''
+                          f'''turn_idx: {turn_idx}, quad_idx: {quad_idx}, fractional_turn_idx: {fractional_turn_idx}''')
 
-                    x2 = np.around(local_radius_x * np.cos(angle), 10)    
-                    y2 = np.around(local_radius_y * np.sin(angle), 10)
+                    # if quad_idx == 3 and angle_idx > 4*quad_idx:
+                    #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + spacing+trace_width)
+                    #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+                    # else:
+                    #local_radius_x = *radius
+                    #local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
+
+                    x2 = radius * np.cos(angle)#np.around(local_radius_x * np.cos(angle), 10)    
+                    y2 = radius * np.sin(angle) #np.around(local_radius_y * np.sin(angle), 10)
                     points.append((x2, y2))
-        
+            print(f'points: \n{np.around(np.array(points), 10)}')
             segment = gdspy.Polygon(points, **process_config['M6'])
             cell.add(segment)
 
