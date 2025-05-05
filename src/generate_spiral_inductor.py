@@ -52,18 +52,10 @@ def generate_spiral_inductor(cell, trace_width, inner_radius, num_turns, guard_r
                     print(f'OUTER:\n')
                 for angle_idx in range(3*quad_idx, 3*quad_idx + 4)[::stride]:
                     angle = vertex_angles[angle_idx % len(vertex_angles)]
-                    fractional_turn_idx = turn_idx#+ quad_idx/4# + ((angle_idx % 4) > 2)/16
-                    #radius =(inner_radius + turn_idx * (spacing + trace_width) + radius_modifier)*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
-                    radius = (inner_radius + turn_idx * (spacing + trace_width) + radius_modifier)*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
+                    fractional_turn_idx = turn_idx+ quad_idx/4 + (angle_idx > (3*quad_idx+1))/4
+                    radius = (inner_radius + fractional_turn_idx * (spacing + trace_width) + radius_modifier)*vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]
                     print(f'''angle_idx: {angle_idx},angle: {np.degrees(angle)}, radius: {radius},'''
                           f'''turn_idx: {turn_idx}, quad_idx: {quad_idx}, fractional_turn_idx: {fractional_turn_idx}''')
-
-                    # if quad_idx == 3 and angle_idx > 4*quad_idx:
-                    #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + spacing+trace_width)
-                    #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                    # else:
-                    #local_radius_x = *radius
-                    #local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
 
                     x2 = radius * np.cos(angle)#np.around(local_radius_x * np.cos(angle), 10)    
                     y2 = radius * np.sin(angle) #np.around(local_radius_y * np.sin(angle), 10)

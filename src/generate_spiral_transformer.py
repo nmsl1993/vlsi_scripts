@@ -81,13 +81,6 @@ def generate_spiral_transformer(
                             octagon_outer_radius = octagon_inner_radius + trace_width/np.cos(np.pi/8)
                         else:
                          octagon_outer_radius = octagon_inner_radius + trace_width
-                        # if quad_idx == 3 and angle_idx > 4*quad_idx and (coil_idx == 0 or not opposite_side_entry):
-                        #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
-                        #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                        # elif opposite_side_entry and coil_idx == 1 and quad_idx == 1 and angle_idx > 4*quad_idx:
-                        #     local_radius_y = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*(radius + 2*(spacing+trace_width))
-                        #     local_radius_x = vertex_normalized_radius[angle_idx % len(vertex_normalized_radius)]*radius
-                        #else:
                         y_modifier = 0
                         if quad_idx == 3 and angle_idx >= 4*quad_idx  and (coil_idx == 0 or not opposite_side_entry):
                             y_modifier = 2*(spacing+trace_width)
@@ -106,8 +99,9 @@ def generate_spiral_transformer(
                         x2 = local_radius_x * np.cos(angle)   
                         y2 = local_radius_y * np.sin(angle)
                         points.append((x2, y2))
-                segment = gdspy.Polygon(points, **process_config['M6'])
-                cell.add(segment)
+                if coil_idx == 0:
+                    segment = gdspy.Polygon(points, **process_config['M6'])
+                    cell.add(segment)
         # Draw entry/exit traces:
         if add_entry_exit_traces and opposite_side_entry:
             COS_PI_8 = np.cos(np.pi/8)
@@ -200,4 +194,4 @@ if __name__ == "__main__":
     cell.write_svg(f'{os.path.join(os.path.dirname(__file__), "..", "outputs", f"spiral_transformer.{suffix}.svg")}')
     
     # Show the cell in a GUI window
-    #gdspy.LayoutViewer(lib)
+    gdspy.LayoutViewer(lib)
