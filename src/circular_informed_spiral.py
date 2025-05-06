@@ -18,13 +18,14 @@ DIRECTIONS = deque([
 ])
 
 # Default parameters
+ROUNDING_NUM_DIGITS = 3
 DEFAULT_TRACE_WIDTH = 3  # um
 DEFAULT_INNER_RADIUS = 20  # um
 DEFAULT_NUM_TURNS = 4
 DEFAULT_SPACING = 7 # um
 DEFAULT_LAYER = 0
 DEFAULT_DATATYPE = 0
-DEFAULT_INITIAL_DIRECTION = DIRECTIONS[2]
+DEFAULT_INITIAL_DIRECTION = DIRECTIONS[6]
 def generate_octagon_spiral(
     cell, trace_width=DEFAULT_TRACE_WIDTH, 
     inner_radius=DEFAULT_INNER_RADIUS,
@@ -74,7 +75,9 @@ def generate_octagon_spiral(
     x = inner_radius*np.cos(3*np.pi/8 + np.pi/4 * starting_direction_idx)
     y = inner_radius*np.sin(3*np.pi/8 + np.pi/4 * starting_direction_idx) 
     print(f'starting point: {x}, {y}')
-    for idx, step in enumerate(np.arange(0, num_turns, 1/8)):
+
+    steps = np.arange(0, num_turns+1/8, 1/8)
+    for idx, step in enumerate(steps):
         radius = inner_radius + step * (spacing + trace_width)
         next_radius = inner_radius + (step + 1/8) * (spacing + trace_width)/COS_PI_8
         
@@ -145,24 +148,72 @@ def generate_octagon_spiral(
         else:
             vertex_angle = np.arctan2(dy, dx) + np.pi/2 - np.pi/8
             next_vertex_angle = np.arctan2(dy, dx) + np.pi/2 + np.pi/8    
-        #vertex_angle = np.arctan2(y, x)
-        #next_vertex_angle = np.arctan2(ynext, xnext)
-                
-        #print(f'y: {y} x: {x}')
-        #print(f'next_y: {ynext} next_x: {xnext}')
-        # points = np.around(np.array([
-        #     (x-trace_width*np.cos(vertex_angle)/2,y-trace_width*np.sin(vertex_angle)/2),
-        #     (xnext-trace_width*np.cos(next_vertex_angle)/2, ynext-trace_width*np.sin(next_vertex_angle)/2),
-        #     (xnext+trace_width*np.cos(next_vertex_angle)/2, ynext+trace_width*np.sin(next_vertex_angle)/2),
-        #     (x+trace_width*np.cos(vertex_angle)/2, y+trace_width*np.sin(vertex_angle)/2)]),3)
-        points = np.around(np.array([
-            (x,y),
-            (xnext, ynext),
-            (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
-            (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),3)
-        #print(f"points: {points}")
-        path = gdspy.Polygon(points, layer=37, datatype=0)
-        cell.add(path)
+
+
+        if dx == 0:
+            ymid = (y+ynext)/2
+
+            # Add first half side of octagon
+            if idx != 0:
+                points = np.around(np.array([
+                    (x,y),
+                    (xnext,ymid),
+                    (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ymid),
+                    (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),
+                ROUNDING_NUM_DIGITS)
+                path = gdspy.Polygon(points, layer=37, datatype=0)
+                cell.add(path)
+
+            # Add second half side of octagon
+            if idx != len(steps)-1:
+                points = np.around(np.array([
+                    (xnext,ymid),
+                    (xnext,ynext),
+                    (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
+                    (x+trace_width*np.cos(vertex_angle)/COS_PI_8, ymid)]),
+
+                ROUNDING_NUM_DIGITS)
+                path = gdspy.Polygon(points, layer=37, datatype=0)
+                cell.add(path)
+        elif dy == 0:
+            xmid = (x+xnext)/2
+
+            # Add first half side of octagon
+            if idx != 0:
+                points = np.around(np.array([
+                    (x,y),
+                    (xmid,y),
+                    (xmid,y+trace_width*np.sin(vertex_angle)/COS_PI_8),
+                    (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),
+                ROUNDING_NUM_DIGITS)
+                path = gdspy.Polygon(points, layer=37, datatype=0)
+                cell.add(path)
+
+            # Add second half side of octagon
+            if idx != len(steps)-1:
+                points = np.around(np.array([
+                    (xmid,ynext),
+                    (xnext,ynext),
+                    (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
+                    (xmid, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),
+                ROUNDING_NUM_DIGITS)
+                path = gdspy.Polygon(points, layer=37, datatype=0)
+                cell.add(path)
+        else:
+            # points = np.around(np.array([
+            #     (x-trace_width*np.cos(vertex_angle)/2,y-trace_width*np.sin(vertex_angle)/2),
+            #     (xnext-trace_width*np.cos(next_vertex_angle)/2, ynext-trace_width*np.sin(next_vertex_angle)/2),
+            #     (xnext+trace_width*np.cos(next_vertex_angle)/2, ynext+trace_width*np.sin(next_vertex_angle)/2),
+            #     (x+trace_width*np.cos(vertex_angle)/2, y+trace_width*np.sin(vertex_angle)/2)]),ROUNDING_NUM_DIGITS)
+            # If direction is vertical or horizontal, draw path as two polygons
+            points = np.around(np.array([
+                (x,y),
+                (xnext, ynext),
+                (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
+                (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),
+            ROUNDING_NUM_DIGITS)
+            path = gdspy.Polygon(points, layer=37, datatype=0)
+            cell.add(path)
 
         x = xnext
         y = ynext
