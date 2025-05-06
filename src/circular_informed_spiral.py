@@ -3,22 +3,36 @@ import gdspy
 import argparse
 import json
 import os
+from collections import deque
+
+# Define the 8 directions for an octagon (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
+DIRECTIONS = deque([
+    (-1, 0),   # 180° (left)
+    (-1, -1),  # 225° (down-left)
+    (0, -1),   # 270° (down)
+    (1, -1),    # 315° (down-right)
+    (1, 0),    # 0° (right)
+    (1, 1),    # 45° (up-right)
+    (0, 1),    # 90° (up)
+    (-1, 1),   # 135° (up-left)
+])
 
 # Default parameters
 DEFAULT_TRACE_WIDTH = 3  # um
 DEFAULT_INNER_RADIUS = 20  # um
-DEFAULT_NUM_TURNS = 2
+DEFAULT_NUM_TURNS = 4
 DEFAULT_SPACING = 7 # um
 DEFAULT_LAYER = 0
 DEFAULT_DATATYPE = 0
-
+DEFAULT_INITIAL_DIRECTION = DIRECTIONS[2]
 def generate_octagon_spiral(
     cell, trace_width=DEFAULT_TRACE_WIDTH, 
     inner_radius=DEFAULT_INNER_RADIUS,
     num_turns=DEFAULT_NUM_TURNS,
     spacing=DEFAULT_SPACING,
     layer=DEFAULT_LAYER,
-    datatype=DEFAULT_DATATYPE
+    datatype=DEFAULT_DATATYPE,
+    initial_direction=DEFAULT_INITIAL_DIRECTION
 ):
     """
     Generate a spiral with octagonal shape using only segments that are
@@ -42,18 +56,14 @@ def generate_octagon_spiral(
     datatype : int
         Datatype for the polygon
     """
-    # Define the 8 directions for an octagon (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
-    directions = [
-        (-1, 0),   # 180° (left)
-        (-1, -1),  # 225° (down-left)
-        (0, -1),   # 270° (down)
-        (1, -1),    # 315° (down-right)
-        (1, 0),    # 0° (right)
-        (1, 1),    # 45° (up-right)
-        (0, 1),    # 90° (up)
-        (-1, 1),   # 135° (up-left)
-    ]
     
+    assert initial_direction in DIRECTIONS, f"Invalid initial direction: {initial_direction}"
+
+    starting_direction_idx = DIRECTIONS.index(initial_direction)
+    print(f"starting_direction_idx: {starting_direction_idx}")
+    ordered_directions = DIRECTIONS.copy()
+    ordered_directions.rotate(-starting_direction_idx)#.tolist()
+    print(f"ordered_directions: {ordered_directions}")
     # Starting point
     current_radius = inner_radius
     points = []
@@ -61,13 +71,14 @@ def generate_octagon_spiral(
     
     #for radius in np.linspace(inner_radius, inner_radius + num_turns * (spacing + trace_width), 8*num_turns):
     COS_PI_8 = np.cos(np.pi/8)
-    x = inner_radius*np.cos(3*np.pi/8)
-    y = inner_radius*np.sin(3*np.pi/8)
+    x = inner_radius*np.cos(3*np.pi/8 + np.pi/4 * starting_direction_idx)
+    y = inner_radius*np.sin(3*np.pi/8 + np.pi/4 * starting_direction_idx) 
+    print(f'starting point: {x}, {y}')
     for idx, step in enumerate(np.arange(0, num_turns, 1/8)):
         radius = inner_radius + step * (spacing + trace_width)
-        next_radius = inner_radius + (step + 1/8) * (spacing + trace_width/COS_PI_8)
+        next_radius = inner_radius + (step + 1/8) * (spacing + trace_width)/COS_PI_8
         
-        print(f"idx: {idx} step: {step} radius: {radius}")
+        #print(f"idx: {idx} step: {step} radius: {radius}")
 
         # bounding circle
         # path = gdspy.Round((0,0), radius, radius, layer=27, datatype=0)
@@ -81,12 +92,13 @@ def generate_octagon_spiral(
         #     (x-trace_width/2, y+trace_width/2)],
         #     layer=37, datatype=0
         #     )
-        print(f"x: {x} y: {y}")
+        #print(f"x: {x} y: {y}")
         path = gdspy.Text(f"{idx}", position=(x, y), size=1, layer=30, datatype=0)
         cell.add(path)
-        pdx, pdy = directions[(idx-1) % len(directions)]
-        dx, dy = directions[idx % len(directions)]
-        ndx, ndy = directions[(idx+1) % len(directions)]
+        pdx, pdy = ordered_directions[(idx-1) % len(ordered_directions)]
+        dx, dy = ordered_directions[idx % len(ordered_directions)]
+        ndx, ndy = ordered_directions[(idx+1) % len(ordered_directions)]
+        print(f"dx: {dx} dy: {dy}")
         # Equation of circle cecntered at zero is:
         # x^2 + y^2 = radius^2
         # Equation of line is:
@@ -97,22 +109,23 @@ def generate_octagon_spiral(
 
         if dx == 0:
             # vertical line
-            print(f"vertical line")
+            #print(f"vertical line")
+            xnext = x
             # y^2 +x^2 - next_radius^2 = 0
             quad_a = 1
             quad_b = 0
-            quad_c = x**2 - next_radius**2
+            quad_c = xnext**2 - next_radius**2
 
             yn1 = (-quad_b - np.sqrt(quad_b**2 - 4*quad_a*quad_c))/(2*quad_a)
             yn2 = (-quad_b + np.sqrt(quad_b**2 - 4*quad_a*quad_c))/(2*quad_a)
 
             # larger difference solution is the next y
             ynext = yn1 if abs(yn1 - y) > abs(yn2 - y) else yn2
-            xnext = x
+            
         else:
             m = dy/dx
             b = y - m*x
-            print(f"m: {m} b: {b}")
+            #print(f"m: {m} b: {b}")
             quad_a = (1+m**2)
             quad_b = 2*m*b
             quad_c = b**2 - next_radius**2
@@ -127,19 +140,16 @@ def generate_octagon_spiral(
         
 
         if dx == 0 or dy == 0:
-            print(f"previous direction: {pdx}, {pdy}")
-            print(f"next direction: {ndx}, {ndy}")
             vertex_angle = np.arctan2(pdy, pdx) + np.pi/2 + np.pi/8
             next_vertex_angle = np.arctan2(ndy, ndx)  + np.pi/2 - np.pi/8            
         else:
-            print(f"cur direction: {dx}, {dy}") 
             vertex_angle = np.arctan2(dy, dx) + np.pi/2 - np.pi/8
             next_vertex_angle = np.arctan2(dy, dx) + np.pi/2 + np.pi/8    
         #vertex_angle = np.arctan2(y, x)
         #next_vertex_angle = np.arctan2(ynext, xnext)
                 
-        print(f'y: {y} x: {x}')
-        print(f'next_y: {ynext} next_x: {xnext}')
+        #print(f'y: {y} x: {x}')
+        #print(f'next_y: {ynext} next_x: {xnext}')
         # points = np.around(np.array([
         #     (x-trace_width*np.cos(vertex_angle)/2,y-trace_width*np.sin(vertex_angle)/2),
         #     (xnext-trace_width*np.cos(next_vertex_angle)/2, ynext-trace_width*np.sin(next_vertex_angle)/2),
@@ -150,7 +160,7 @@ def generate_octagon_spiral(
             (xnext, ynext),
             (xnext+trace_width*np.cos(next_vertex_angle)/COS_PI_8, ynext+trace_width*np.sin(next_vertex_angle)/COS_PI_8),
             (x+trace_width*np.cos(vertex_angle)/COS_PI_8, y+trace_width*np.sin(vertex_angle)/COS_PI_8)]),3)
-        print(f"points: {points}")
+        #print(f"points: {points}")
         path = gdspy.Polygon(points, layer=37, datatype=0)
         cell.add(path)
 
